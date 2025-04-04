@@ -1,0 +1,1 @@
+pyinstaller --onefile --add-data=app.py:. main.py
