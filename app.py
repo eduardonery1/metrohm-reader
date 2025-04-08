@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from threading import RLock
+
+_lock = RLock()
 
 
 st.title("Extrator de métricas")
@@ -23,6 +27,26 @@ if uploaded_file:
     st.write(f"**Número de linhas:** {len(df)}")
     st.write(f"**Número de colunas:** {len(df.columns)}")
     
+    st.write("## Análise geral")
+    scan1 = pd.to_numeric(df.where(df['Scan'] == 1).fillna(0)['WE(1).Current (A)'], errors='coerce')
+    scan2 = pd.to_numeric(df.where(df['Scan'] == 2).fillna(0)['WE(1).Current (A)'], errors='coerce')
+    scan3 = pd.to_numeric(df.where(df['Scan'] == 3).fillna(0)['WE(1).Current (A)'], errors='coerce')
+    avg = (scan1 + scan2 + scan3)/3
+    st.write('### Média das correntes')
+    st.write(avg)
+
+    with _lock:
+        fig, ax = plt.subplots()
+        ax.plot(df.where(df['Scan'] == 1)['Potential applied (V)'], avg)
+        ax.set_xlabel('Potential applied (V)')
+        ax.set_ylabel('WE(1).Current (A)')
+        ax.set_title('Corrente média em função do potencial')
+        ax.legend()
+        st.pyplot(fig)
+
+    st.write('### Descrição da média')
+    st.write(avg.describe())
+
     for i in range(1, df['Scan'].max() + 1):
         df_scan = df.where(df['Scan'] == i).dropna(how='all')
         st.write(f"### Scan {i}")
@@ -48,3 +72,17 @@ if uploaded_file:
         st.write(f"**Pico da corrente (Forward):** {peak_current_forward:.2e} at {peak_potential_forward:.2f} V")
         st.write(f"**Vale da corrente (Reverse):** {min_current_reverse:.2e} at {min_potential_reverse:.2f} V")
 
+        # Find the potential at half the peak current (forward)
+        half_peak_current_forward = peak_current_forward / 2
+        # Find the potential value closest to the half peak current
+        potential_at_half_peak_forward = df['Potential applied (V)'].iloc[(df['WE(1).Current (A)'] - half_peak_current_forward).abs().argsort()[0]]
+        st.write(f"**Potencial a metade do pico (Forward):** {potential_at_half_peak_forward:.2f} V")
+
+        # Find the potential at half the minimum current (reverse)
+        half_min_current_reverse = min_current_reverse / 2
+        # Find the potential value closest to the half minimum current
+        potential_at_half_min_reverse = df['Potential applied (V)'].iloc[(df['WE(1).Current (A)'] - half_min_current_reverse).abs().argsort()[0]]
+        st.write(f"**Potencial a metade do vale (Reverse):** {potential_at_half_min_reverse:.2f} V")
+
+    # Scan by scan, take the average of currents 
+     
